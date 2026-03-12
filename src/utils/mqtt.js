@@ -42,6 +42,17 @@ const doSubscribe = () => {
   });
 };
 
+const doUnSubscribe = () => {
+  const { topic, qos } = subscription.value;
+  client.unsubscribe(topic, { qos }, (error) => {
+    if (error) {
+      console.log("unsubscribe error:", error);
+      return;
+    }
+    console.log(`unsubscribed topic: ${topic}`);
+  });
+};
+
 // let messageCallback = null;
 
 // // 初始化MQTT连接
