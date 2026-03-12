@@ -1,89 +1,15 @@
 <script setup>
-import { ref } from "vue";
-import { initMqtt, disconnect, updateMqttConfig, defaultMqttConfig } from "@/utils/mqtt";
-import { useSensorStore } from "@/stores/sensorStore";
+import {
+  isConnected,
+  updateMqttConfig,
+  defaultMqttConfig,
+  connectMqtt,
+  disconnectMqtt,
+} from "@/utils/mqtt";
+// import { useSensorStore } from "@/stores/sensorStore";
 
-const sensorStore = useSensorStore();
-const isConnected = ref(false);
-const mqttBroker = ref(defaultMqttConfig.broker);
-const mqttPort = ref(defaultMqttConfig.port);
-const mqttUsername = ref(defaultMqttConfig.username);
-const mqttPassword = ref(defaultMqttConfig.password);
-
-// 处理MQTT消息
-const handleMessage = (topic, data) => {
-  console.log("收到MQTT消息:", topic, data);
-  // 更新传感器数据
-  sensorStore.updateSensorData(data);
-};
-
-// 显示提示消息
-const showMessage = (message, type = "info") => {
-  // 创建提示元素
-  const messageElement = document.createElement("div");
-  messageElement.className = `mqtt-message mqtt-message-${type}`;
-  messageElement.textContent = message;
-  messageElement.style.position = "fixed";
-  messageElement.style.top = "20px";
-  messageElement.style.right = "20px";
-  messageElement.style.padding = "10px 15px";
-  messageElement.style.borderRadius = "8px";
-  messageElement.style.color = "white";
-  messageElement.style.fontSize = "14px";
-  messageElement.style.fontWeight = "500";
-  messageElement.style.zIndex = "9999";
-  messageElement.style.animation = "slideIn 0.3s ease-in-out";
-
-  // 设置不同类型的背景色
-  if (type === "success") {
-    messageElement.style.backgroundColor = "#28a745";
-  } else if (type === "error") {
-    messageElement.style.backgroundColor = "#dc3545";
-  } else {
-    messageElement.style.backgroundColor = "#6c757d";
-  }
-
-  // 添加到页面
-  document.body.appendChild(messageElement);
-
-  // 3秒后移除
-  setTimeout(() => {
-    messageElement.style.animation = "slideOut 0.3s ease-in-out";
-    setTimeout(() => {
-      document.body.removeChild(messageElement);
-    }, 300);
-  }, 3000);
-};
-
-// 切换MQTT连接状态
-const toggleMqttConnection = () => {
-  if (isConnected.value) {
-    // 断开连接
-    disconnect();
-    isConnected.value = false;
-    console.log("MQTT连接已断开");
-    showMessage("MQTT连接已断开", "info");
-  } else {
-    // 连接到MQTT
-    updateMqttConfig({
-      broker: mqttBroker.value,
-      port: mqttPort.value,
-      username: mqttUsername.value,
-      password: mqttPassword.value,
-    });
-    console.log("正在连接MQTT...");
-    showMessage("正在连接MQTT...", "info");
-    initMqtt(handleMessage, (connected, message) => {
-      isConnected.value = connected;
-      console.log(`MQTT连接状态: ${connected ? "成功" : "失败"}`, message);
-      if (connected) {
-        showMessage("MQTT连接成功", "success");
-      } else {
-        showMessage(`MQTT连接失败 (${message})`, "error");
-      }
-    });
-  }
-};
+// const sensorStore = useSensorStore();
+const mqttConfig = defaultMqttConfig.value;
 </script>
 
 <template>
@@ -96,30 +22,75 @@ const toggleMqttConnection = () => {
           <label>连接地址</label>
           <input
             type="text"
-            v-model="mqttBroker"
+            v-model.trim="mqttConfig.broker"
             placeholder="MQTT Broker地址"
             class="mqtt-input"
           />
         </div>
         <div class="input-group">
           <label>端口</label>
-          <input type="number" v-model="mqttPort" placeholder="端口" class="mqtt-input" />
+          <input
+            type="number"
+            v-model.trim.number="mqttConfig.port"
+            placeholder="端口"
+            class="mqtt-input"
+          />
         </div>
         <div class="input-group">
           <label>用户名</label>
-          <input type="text" v-model="mqttUsername" placeholder="用户名" class="mqtt-input" />
+          <input
+            type="text"
+            v-model.trim="mqttConfig.username"
+            placeholder="用户名"
+            class="mqtt-input"
+          />
+        </div>
+        <div class="input-group">
+          <label>主题</label>
+          <input
+            type="text"
+            v-model.trim="mqttConfig.topic"
+            placeholder="主题"
+            class="mqtt-input"
+          />
         </div>
         <div class="input-group">
           <label>密码</label>
-          <input type="password" v-model="mqttPassword" placeholder="密码" class="mqtt-input" />
+          <input
+            type="password"
+            v-model="mqttConfig.password"
+            placeholder="密码"
+            class="mqtt-input"
+          />
         </div>
         <div class="button-group">
           <button
             class="control-btn"
-            :class="{ 'btn-success': isConnected, 'btn-primary': !isConnected }"
-            @click="toggleMqttConnection"
+            @click="
+              updateMqttConfig({
+                broker: mqttConfig.broker,
+                port: mqttConfig.port,
+                topic: mqttConfig.topic,
+                username: mqttConfig.username,
+                password: mqttConfig.password,
+              })
+            "
+          >
+            保存配置
+          </button>
+          <button
+            class="control-btn"
+            :class="{ 'btn-success': isConnected, 'btn-primary': isConnected }"
+            @click="connectMqtt"
           >
             "连接MQTT"
+          </button>
+          <button
+            class="control-btn btn-danger"
+            :class="{ 'btn-success': isConnected, 'btn-primary': isConnected }"
+            @click="disconnectMqtt"
+          >
+            "断开MQTT"
           </button>
         </div>
       </div>
@@ -231,7 +202,7 @@ const toggleMqttConnection = () => {
   color: #28a745;
 }
 
-.connection-status.disconnected {
+.connection-status.disconnected1 {
   background: rgba(220, 53, 69, 0.1);
   color: #dc3545;
 }

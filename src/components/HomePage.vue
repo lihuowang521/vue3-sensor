@@ -3,34 +3,53 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 
-const enterMonitoring = () => {
-  router.push("/monitoring-interface");
+/**
+ * 跳转到实时监控页面
+ */
+const goToMonitoring = () => {
+  try {
+    router.push("/monitoring-interface");
+  } catch (error) {
+    console.error("跳转到监控页面失败：", error);
+    alert("页面跳转失败，请检查路由配置！");
+  }
 };
 
-const enterSettings = () => {
-  router.push("/setting");
+/**
+ * 跳转到参数设置页面
+ */
+const goToSettings = () => {
+  try {
+    router.push("/setting");
+  } catch (error) {
+    console.error("跳转到设置页面失败：", error);
+    alert("页面跳转失败，请检查路由配置！");
+  }
 };
 
-const enterHistory = () => {
-  router.push("/history");
+/**
+ * 跳转到历史数据页面
+ */
+const goToHistory = () => {
+  try {
+    router.push("/history");
+  } catch (error) {
+    console.error("跳转到历史数据页面失败：", error);
+    alert("页面跳转失败，请检查路由配置！");
+  }
 };
 </script>
 
 <template>
   <div>
     <main class="main-grid">
-      <!-- 实时监控功能卡片 -->
-      <div class="feature-card" @click="enterMonitoring()">
-        <!-- 点击卡片触发监控页面跳转 -->
+      <!-- 实时监控功能卡片：仅卡片绑定跳转，按钮无重复事件 -->
+      <div class="feature-card" @click="goToMonitoring()">
         <div class="card-icon">📊</div>
-        <!-- 卡片图标 -->
         <h2 class="card-title">实时监控</h2>
-        <!-- 卡片标题 -->
         <p class="card-description">
-          <!-- 卡片描述 -->
           实时监控压力数据，智能仪表盘显示，直观展示传感器状态和报警信息
         </p>
-        <!-- 功能列表 -->
         <ul class="card-features">
           <li>实时压力数值显示</li>
           <li>直观仪表盘界面</li>
@@ -38,22 +57,16 @@ const enterHistory = () => {
           <li>智能报警提示</li>
           <li>系统参数监控</li>
         </ul>
-        <button class="enter-btn" @click.stop="enterMonitoring()">进入监控</button>
-        <!-- 进入按钮 -->
+        <button class="enter-btn">进入监控</button>
       </div>
 
       <!-- 参数设置功能卡片 -->
-      <div class="feature-card" @click="enterSettings()">
-        <!-- 点击卡片触发设置页面跳转 -->
+      <div class="feature-card" @click="goToSettings()">
         <div class="card-icon">⚙️</div>
-        <!-- 卡片图标 -->
         <h2 class="card-title">参数设置</h2>
-        <!-- 卡片标题 -->
         <p class="card-description">
-          <!-- 卡片描述 -->
           灵活配置传感器参数，包括采样频率、报警阈值、串口通信等关键设置
         </p>
-        <!-- 功能列表 -->
         <ul class="card-features">
           <li>采样频率配置</li>
           <li>报警上下阈值设置</li>
@@ -61,22 +74,14 @@ const enterHistory = () => {
           <li>传感器校准</li>
           <li>一键恢复默认</li>
         </ul>
-        <button class="enter-btn" @click.stop="enterSettings()">进入设置</button>
-        <!-- 进入按钮 -->
+        <button class="enter-btn">进入设置</button>
       </div>
 
       <!-- 历史数据功能卡片 -->
-      <div class="feature-card" @click="enterHistory()">
-        <!-- 点击卡片触发历史数据页面跳转 -->
+      <div class="feature-card" @click="goToHistory()">
         <div class="card-icon">📈</div>
-        <!-- 卡片图标 -->
         <h2 class="card-title">历史数据</h2>
-        <!-- 卡片标题 -->
-        <p class="card-description">
-          <!-- 卡片描述 -->
-          查询历史压力数据，支持时间筛选、数据导出和趋势分析功能
-        </p>
-        <!-- 功能列表 -->
+        <p class="card-description">查询历史压力数据，支持时间筛选、数据导出和趋势分析功能</p>
         <ul class="card-features">
           <li>时间范围筛选</li>
           <li>历史数据表格</li>
@@ -84,15 +89,12 @@ const enterHistory = () => {
           <li>数据统计展示</li>
           <li>Excel数据导出</li>
         </ul>
-        <button class="enter-btn" @click.stop="enterHistory()">查看历史</button>
-        <!-- 进入按钮 -->
+        <button class="enter-btn">查看历史</button>
       </div>
     </main>
 
-    <!-- 页脚：显示系统信息、技术规格和应用场景 -->
     <footer class="footer">
       <div class="footer-content">
-        <!-- 系统特点 -->
         <div class="footer-section">
           <h4>系统特点</h4>
           <ul>
@@ -103,7 +105,6 @@ const enterHistory = () => {
           </ul>
         </div>
 
-        <!-- 技术规格 -->
         <div class="footer-section">
           <h4>技术规格</h4>
           <ul>
@@ -114,7 +115,6 @@ const enterHistory = () => {
           </ul>
         </div>
 
-        <!-- 应用场景 -->
         <div class="footer-section">
           <h4>应用场景</h4>
           <ul>
@@ -126,13 +126,19 @@ const enterHistory = () => {
         </div>
       </div>
 
-      <!-- 版权信息 -->
       <div class="copyright">© 2026 智能压力传感器监控系统 | 版本 v0.4.7 | 技术支持: HX711系列</div>
     </footer>
   </div>
 </template>
 
 <style scoped>
+/* 重置默认样式 */
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .main-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -147,7 +153,7 @@ const enterHistory = () => {
   border-radius: 20px;
   padding: 30px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  transition: all 0.3s ease-in-out; /* 更丝滑的过渡 */
   cursor: pointer;
   animation: fadeInUp 0.6s ease forwards;
 }
@@ -157,6 +163,7 @@ const enterHistory = () => {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
+/* 仅保留3个卡片的动画延迟，删除无效样式 */
 .feature-card:nth-child(1) {
   animation-delay: 0.1s;
 }
@@ -167,14 +174,6 @@ const enterHistory = () => {
 
 .feature-card:nth-child(3) {
   animation-delay: 0.3s;
-}
-
-.feature-card:nth-child(4) {
-  animation-delay: 0.4s;
-}
-
-.feature-card:nth-child(5) {
-  animation-delay: 0.5s;
 }
 
 .card-icon {
@@ -244,9 +243,15 @@ const enterHistory = () => {
   transition: all 0.3s ease;
 }
 
+/* 增加按钮按下反馈 */
 .enter-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.enter-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
 }
 
 .footer {
@@ -269,10 +274,7 @@ const enterHistory = () => {
   color: #2c3e50;
   margin-bottom: 10px;
   font-size: 16px;
-}
-
-.footer-section ul {
-  list-style: none;
+  margin-top: 0; /* 重置默认margin */
 }
 
 .footer-section ul li {
@@ -336,11 +338,11 @@ const enterHistory = () => {
   }
 }
 
-/* 动画效果 */
+/* 优化动画：初始位移更小，更自然 */
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(20px); /* 从30px改为20px */
   }
 
   to {

@@ -1,177 +1,187 @@
 import mqtt from "mqtt";
 import { ref } from "vue";
 
-export let defaultMqttConfig = {
+// 默认MQTT配置
+export const defaultMqttConfig = ref({
   broker: "va1af2fe.ala.cn-hangzhou.emqxsl.cn",
-  port: 8884,
+  port: 8084,
   topic: "sensor/data",
   username: "qqqqwwww",
   password: "123456",
-};
-const clientId = "emqx_vue3_" + Math.random().toString(16).substring(2, 8);
-
-// MQTT连接配置
-let mqttConfig = { ...defaultMqttConfig };
-
-// 更新MQTT配置
-export const updateMqttConfig = (config) => {
-  mqttConfig = { ...mqttConfig, ...config };
-};
-
-let client = mqtt.connect(`wss://${mqttConfig.broker}:${mqttConfig.port}/mqtt`, {
-  clientId: clientId,
-  username: mqttConfig.username,
-  password: mqttConfig.password,
-  // ...other options
 });
 
-// 设置将要订阅的主题和 QoS
-const subscription = ref({
-  topic: mqttConfig.topic,
+// 连接状态
+export const isConnected = ref(false);
+
+// 🔥 新增：响应式变量保存订阅到的传感器数据（供页面使用）
+export const receivedSensorData = ref(null);
+// 🔥 新增：保存历史数据（可选，用于趋势图/历史页面）
+export const sensorDataHistory = ref([]);
+
+// 更新MQTT配置
+export const updateMqttConfig = (newConfig) => {
+  Object.assign(defaultMqttConfig.value, newConfig);
+};
+
+// MQTT客户端实例
+export let client = null;
+
+// 连接MQTT函数（补充接收消息逻辑）
+export const connectMqtt = () => {
+  // 配置校验
+  if (!defaultMqttConfig.value.broker) {
+    alert("请填写MQTT连接地址！");
+    return null;
+  }
+  if (
+    isNaN(defaultMqttConfig.value.port) ||
+    defaultMqttConfig.value.port < 0 ||
+    defaultMqttConfig.value.port > 65535
+  ) {
+    alert("请填写合法的端口号（0-65535）！");
+    return null;
+  }
+
+  // 生成clientId
+  const clientId = "emqx_vue3_" + Math.random().toString(16).substring(2, 8);
+
+  // 断开已有连接
+  if (client) {
+    client.end();
+    client = null;
+  }
+
+  try {
+    client = mqtt.connect(
+      `wss://${defaultMqttConfig.value.broker}:${defaultMqttConfig.value.port}/mqtt`,
+      {
+        clientId: clientId,
+        username: defaultMqttConfig.value.username,
+        password: defaultMqttConfig.value.password,
+        clean: true,
+        reconnectPeriod: 1000,
+        connectTimeout: 30 * 1000,
+      },
+    );
+
+    // 连接成功
+    client.on("connect", () => {
+      console.log("MQTT连接成功！");
+      isConnected.value = true;
+      // 订阅主题
+      client.subscribe(defaultMqttConfig.value.topic, (err) => {
+        if (!err) {
+          console.log(`订阅主题 ${defaultMqttConfig.value.topic} 成功`);
+          alert(`订阅主题 ${defaultMqttConfig.value.topic} 成功`);
+        }
+      });
+    });
+
+    // 🔥 核心补充：监听收到的消息（订阅数据）
+    client.on("message", (topic, payload) => {
+      try {
+        // 1. 将二进制payload转为JSON对象（传感器数据）
+        const data = JSON.parse(payload.toString());
+        console.log(`收到${topic}主题的消息：`, data);
+
+        // 2. 保存到响应式变量（供页面实时显示）
+        receivedSensorData.value = data;
+
+        // 3. 保存到历史数据（可选，限制最多100条，避免内存溢出）
+        sensorDataHistory.value.push({
+          ...data,
+          timestamp: new Date().toLocaleString(), // 追加时间戳
+        });
+        if (sensorDataHistory.value.length > 100) {
+          sensorDataHistory.value.shift(); // 只保留最新100条
+        }
+
+        // 4. 可选：保存到本地存储（持久化，页面刷新不丢失）
+        localStorage.setItem("latestSensorData", JSON.stringify(receivedSensorData.value));
+        localStorage.setItem("sensorDataHistory", JSON.stringify(sensorDataHistory.value));
+      } catch (err) {
+        console.error("解析MQTT消息失败：", err);
+      }
+    });
+
+    // 连接错误
+    client.on("error", (err) => {
+      console.error("MQTT连接失败：", err);
+      isConnected.value = false;
+      alert(`MQTT连接失败：${err.message}`);
+      client = null;
+    });
+
+    // 连接断开
+    client.on("close", () => {
+      console.log("MQTT连接已断开");
+      isConnected.value = false;
+      client = null;
+    });
+
+    return client;
+  } catch (err) {
+    console.error("创建MQTT连接失败：", err);
+    alert(`创建连接失败：${err.message}`);
+    return null;
+  }
+};
+
+// 断开MQTT连接
+export const disconnectMqtt = () => {
+  if (client) {
+    client.end();
+    client = null;
+    isConnected.value = false;
+    console.log("手动断开MQTT连接");
+  }
+};
+
+// 发布消息配置
+const publish = ref({
+  topic: defaultMqttConfig.value.topic,
+  payload: {
+    pipe_id: "P001",
+    flange_id: "F01",
+    sensor_position: 1,
+    position_angle: 0.0,
+    pressure: 1.0,
+    raw_pressure: 1.0,
+    battery_voltage: 3.5,
+    signal_strength: -70,
+    parsed_time: "2026-03-11 10:00:00",
+    is_abnormal: 0,
+  },
   qos: 0,
 });
 
-const doSubscribe = () => {
-  const { topic, qos } = subscription.value;
-  client.subscribe(topic, { qos }, (error, granted) => {
-    if (error) {
-      console.log("subscribe error:", error);
-      return;
-    }
-    console.log("subscribe successfully:", granted);
-  });
+// 发布消息
+export const doPublish = () => {
+  const { topic, qos, payload } = publish.value;
+
+  try {
+    const jsonPayload = JSON.stringify(payload);
+    client.publish(topic, jsonPayload, { qos }, (error) => {
+      if (error) {
+        console.error("MQTT 发布失败:", error);
+        return;
+      }
+      console.log("发布成功，原始数据：", payload);
+      console.log("发布的 JSON 字符串：", jsonPayload);
+    });
+  } catch (err) {
+    console.error("JSON 序列化失败:", err);
+  }
 };
 
-const doUnSubscribe = () => {
-  const { topic, qos } = subscription.value;
-  client.unsubscribe(topic, { qos }, (error) => {
-    if (error) {
-      console.log("unsubscribe error:", error);
-      return;
-    }
-    console.log(`unsubscribed topic: ${topic}`);
-  });
+// 🔥 新增：初始化时从本地存储加载历史数据（可选）
+export const initSensorData = () => {
+  const latestData = localStorage.getItem("latestSensorData");
+  const historyData = localStorage.getItem("sensorDataHistory");
+  if (latestData) {
+    receivedSensorData.value = JSON.parse(latestData);
+  }
+  if (historyData) {
+    sensorDataHistory.value = JSON.parse(historyData);
+  }
 };
-
-// let messageCallback = null;
-
-// // 初始化MQTT连接
-// export const initMqtt = (callback, connectionCallback) => {
-//   // 优化：先断开旧连接，避免重复创建
-//   if (client) {
-//     client.end();
-//     client = null;
-//   }
-//   const url = `wss://${mqttConfig.broker}:${mqttConfig.port}/mqtt`;
-
-//   // 创建客户端
-//   client = mqtt.connect(url, {
-//     username: mqttConfig.username,
-//     password: mqttConfig.password,
-//     clean: true,
-//     connectTimeout: 4000,
-//     reconnection: true,
-//     reconnectionAttempts: 5,
-//     reconnectionDelay: 1000,
-//   });
-
-//   // 保存回调函数
-//   messageCallback = callback;
-
-//   // 连接成功事件
-//   client.on("connect", () => {
-//     console.log("MQTT连接成功");
-//     // 订阅主题
-//     client.subscribe(mqttConfig.topic, (err) => {
-//       if (err) {
-//         console.error("订阅主题失败:", err);
-//         if (connectionCallback) {
-//           connectionCallback(false, "订阅主题失败");
-//         }
-//       } else {
-//         console.log("订阅主题成功:", mqttConfig.topic);
-//         if (connectionCallback) {
-//           connectionCallback(true, "连接成功");
-//         }
-//       }
-//     });
-//   });
-
-//   // 接收消息事件
-//   client.on("message", (topic, message) => {
-//     console.log("收到消息:", topic, message.toString());
-//     if (messageCallback) {
-//       try {
-//         const data = JSON.parse(message.toString());
-//         messageCallback(topic, data);
-//       } catch (error) {
-//         console.error("解析消息失败:", error);
-//       }
-//     }
-//   });
-
-//   // 连接错误事件
-//   client.on("error", (error) => {
-//     console.error("MQTT连接错误:", error);
-//     console.log("错误原因:", error.message || error);
-//     if (connectionCallback) {
-//       connectionCallback(false, error.message);
-//     }
-//   });
-
-//   // 断开连接事件
-//   client.on("close", () => {
-//     console.log("MQTT连接断开");
-//   });
-// };
-
-// // 发布消息
-// export const publish = (topic, message) => {
-//   if (client && client.connected) {
-//     client.publish(topic, message, (err) => {
-//       if (err) {
-//         console.error("发布消息失败:", err);
-//       }
-//     });
-//   } else {
-//     console.error("MQTT客户端未连接");
-//   }
-// };
-
-// // 订阅主题
-// export const subscribe = (topic) => {
-//   if (client && client.connected) {
-//     client.subscribe(topic, (err) => {
-//       if (err) {
-//         console.error("订阅主题失败:", err);
-//       } else {
-//         console.log("订阅主题成功:", topic);
-//       }
-//     });
-//   } else {
-//     console.error("MQTT客户端未连接");
-//   }
-// };
-
-// // 取消订阅
-// export const unsubscribe = (topic) => {
-//   if (client && client.connected) {
-//     client.unsubscribe(topic, (err) => {
-//       if (err) {
-//         console.error("取消订阅失败:", err);
-//       } else {
-//         console.log("取消订阅成功:", topic);
-//       }
-//     });
-//   } else {
-//     console.error("MQTT客户端未连接");
-//   }
-// };
-
-// // 断开连接
-// export const disconnect = () => {
-//   if (client) {
-//     client.end();
-//     client = null;
-//   }
-// };

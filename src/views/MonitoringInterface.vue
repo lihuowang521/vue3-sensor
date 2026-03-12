@@ -1,3 +1,13 @@
+<script setup>
+import { ref } from "vue";
+
+let selectedSensor = ref("sensor1");
+
+// 初始化图表
+
+// 更新图表
+</script>
+
 <template>
   <div>
     <main class="main-content">
@@ -152,134 +162,6 @@
     </section>
   </div>
 </template>
-
-<script setup>
-import { ref, onMounted, onUnmounted, watch } from "vue";
-import { useSensorStore } from "@/stores/sensorStore";
-import { initMqtt, disconnect } from "@/utils/mqtt";
-import * as echarts from "echarts";
-
-const sensorStore = useSensorStore();
-const chartRef = ref(null);
-let chartInstance = null;
-let selectedSensor = ref("sensor1");
-
-// 初始化图表
-const initChart = () => {
-  if (chartRef.value) {
-    chartInstance = echarts.init(chartRef.value);
-    updateChart();
-  }
-};
-
-// 更新图表
-const updateChart = () => {
-  if (!chartInstance) return;
-
-  const data = sensorStore.chartData;
-  const timestamps = data.map((item) => item.timestamp);
-  const sensorValues = data.map((item) => item[selectedSensor.value] || 0);
-
-  const option = {
-    title: {
-      text: `${selectedSensor.value} 压力趋势`,
-      left: "center",
-    },
-    tooltip: {
-      trigger: "axis",
-      formatter: "{b}: {c} kPa",
-    },
-    xAxis: {
-      type: "category",
-      data: timestamps,
-      axisLabel: {
-        rotate: 45,
-      },
-    },
-    yAxis: {
-      type: "value",
-      name: "压力 (kPa)",
-    },
-    series: [
-      {
-        data: sensorValues,
-        type: "line",
-        smooth: true,
-        lineStyle: {
-          color: "#667eea",
-        },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            {
-              offset: 0,
-              color: "rgba(102, 126, 234, 0.5)",
-            },
-            {
-              offset: 1,
-              color: "rgba(102, 126, 234, 0.1)",
-            },
-          ]),
-        },
-      },
-    ],
-  };
-
-  chartInstance.setOption(option);
-};
-
-// 处理MQTT消息
-const handleMessage = (topic, data) => {
-  console.log("收到MQTT消息:", topic, data);
-  // 更新传感器数据
-  sensorStore.updateSensorData(data);
-};
-
-// 监听传感器选择变化
-const handleSensorChange = (event) => {
-  selectedSensor.value = event.target.value;
-  updateChart();
-};
-
-// 监听图表数据变化
-watch(
-  () => sensorStore.chartData,
-  () => {
-    updateChart();
-  },
-  { deep: true },
-);
-
-// 监听窗口大小变化，调整图表大小
-const handleResize = () => {
-  if (chartInstance) {
-    chartInstance.resize();
-  }
-};
-
-onMounted(() => {
-  // 初始化图表
-  initChart();
-
-  // 初始化MQTT连接
-  initMqtt(handleMessage);
-
-  // 监听窗口大小变化
-  window.addEventListener("resize", handleResize);
-});
-
-onUnmounted(() => {
-  // 断开MQTT连接
-  disconnect();
-
-  // 移除事件监听器
-  window.removeEventListener("resize", handleResize);
-
-  // 销毁图表实例
-  if (chartInstance) {
-    chartInstance.dispose();
-  }
-});
-</script>
 
 <style scoped>
 /* 传感器圆形布局样式 */

@@ -1,3 +1,16 @@
+<script setup>
+// import { ref } from "vue";
+// // import { useSensorStore } from "@/stores/sensorStore";
+
+// // const sensorStore = useSensorStore();
+// const lastExportTime = ref("未导出过");
+
+// const exportData = () => {
+//   sensorStore.exportDataToCSV();
+//   lastExportTime.value = new Date().toLocaleString();
+// };
+</script>
+
 <template>
   <div class="export-container">
     <h2 class="page-title">导出数据</h2>
@@ -57,19 +70,6 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref } from "vue";
-import { useSensorStore } from "@/stores/sensorStore";
-
-const sensorStore = useSensorStore();
-const lastExportTime = ref("未导出过");
-
-const exportData = () => {
-  sensorStore.exportDataToCSV();
-  lastExportTime.value = new Date().toLocaleString();
-};
-</script>
 
 <style scoped>
 .export-container {

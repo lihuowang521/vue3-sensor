@@ -1,14 +1,15 @@
 <script setup>
+import { ref, onMounted, onUnmounted, defineOptions } from "vue";
+import { useRouter } from "vue-router";
 
-// 组件名称
+// 兼容Vue 3.3-版本：若defineOptions报错，可替换为/* eslint-disable */
 defineOptions({
   name: "SettingPage",
 });
 
-import { ref, onMounted } from "vue";
-
-// 响应式设置数据
-const settings = ref({
+const router = useRouter();
+// 抽离默认配置常量（避免重复）
+const DEFAULT_SETTINGS = {
   samplingRate: "100",
   lowerThreshold: "50",
   upperThreshold: "200",
@@ -19,79 +20,150 @@ const settings = ref({
   protocolAddress: "ws://127.0.0.1:8083/mqtt",
   zeroCalibration: "0.0",
   fullScaleCalibration: "300.0",
-});
+};
 
+// 响应式设置数据
+const settings = ref({ ...DEFAULT_SETTINGS });
+// 按钮加载状态
+const buttonLoading = ref({
+  save: false,
+  reset: false,
+});
 // 状态消息
 const statusMessage = ref({
   show: false,
   message: "",
   type: "", // 'success' or 'error'
 });
+// 定时器实例（用于清理）
+let messageTimer = null;
 
-// 保存配置
-const saveSettings = () => {
+// 数据校验函数
+const validateSettings = () => {
+  const lower = Number(settings.value.lowerThreshold);
+  const upper = Number(settings.value.upperThreshold);
+  const fullScale = Number(settings.value.fullScaleCalibration);
+  // const samplingRate = Number(settings.value.samplingRate);
+
+  // 校验阈值逻辑
+  if (lower >= upper) {
+    showStatusMessage("报警下限不能大于等于上限！", "error");
+    return false;
+  }
+  // 校验数值范围
+  if (lower < 0 || lower > 1000 || upper < 0 || upper > 1000) {
+    showStatusMessage("报警阈值需在0-1000 kPa之间！", "error");
+    return false;
+  }
+  // 校验采样频率
+  const validRates = ["10", "50", "100", "500", "1000"];
+  if (!validRates.includes(settings.value.samplingRate)) {
+    showStatusMessage("采样频率只能选择10/50/100/500/1000 Hz！", "error");
+    return false;
+  }
+  // 校验MQTT地址格式
+  if (!/^ws(s)?:\/\/.+:\d+\/mqtt$/.test(settings.value.protocolAddress)) {
+    showStatusMessage("MQTT地址格式错误（例：ws://127.0.0.1:8083/mqtt）！", "error");
+    return false;
+  }
+  // 校验满量程值
+  if (fullScale <= 0 || fullScale > 1000) {
+    showStatusMessage("满量程校准值需在0-1000 kPa之间！", "error");
+    return false;
+  }
+  return true;
+};
+
+// 保存配置（加校验+加载状态）
+const saveSettings = async () => {
+  if (buttonLoading.value.save) return;
+  // 先校验
+  if (!validateSettings()) return;
+
+  buttonLoading.value.save = true;
   try {
-    // 模拟保存到本地存储
-    localStorage.setItem("sensorSettings", JSON.stringify(settings.value));
+    // 模拟异步保存（贴近真实接口场景）
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    // 本地存储加版本标识
+    const saveData = {
+      version: "1.0", // 版本管理，后续变更可兼容
+      settings: settings.value,
+    };
+    localStorage.setItem("sensorSettings", JSON.stringify(saveData));
     showStatusMessage("配置保存成功！", "success");
   } catch (error) {
     showStatusMessage("保存配置失败：" + error.message, "error");
+  } finally {
+    buttonLoading.value.save = false;
   }
 };
 
-// 恢复默认配置
-const resetToDefault = () => {
-  settings.value = {
-    samplingRate: "100",
-    lowerThreshold: "50",
-    upperThreshold: "200",
-    baudRate: "115200",
-    dataBits: "8",
-    stopBits: "1",
-    parity: "none",
-    protocolAddress: "ws://127.0.0.1:8083/mqtt",
-    zeroCalibration: "0.0",
-    fullScaleCalibration: "300.0",
-  };
-  showStatusMessage("已恢复默认配置！", "success");
+// 恢复默认配置（加加载状态）
+const resetToDefault = async () => {
+  if (buttonLoading.value.reset) return;
+  buttonLoading.value.reset = true;
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    settings.value = { ...DEFAULT_SETTINGS };
+    showStatusMessage("已恢复默认配置！", "success");
+  } catch (error) {
+    showStatusMessage("恢复默认失败：" + error.message, "error");
+  } finally {
+    buttonLoading.value.reset = false;
+  }
 };
 
-// 显示状态消息
+// 显示状态消息（清理旧定时器）
 const showStatusMessage = (message, type) => {
+  // 清除旧定时器，避免多个提示叠加
+  if (messageTimer) clearTimeout(messageTimer);
+
   statusMessage.value = {
     show: true,
     message,
     type,
   };
   // 3秒后自动隐藏
-  setTimeout(() => {
+  messageTimer = setTimeout(() => {
     statusMessage.value.show = false;
   }, 3000);
 };
 
-// 页面加载时从本地存储读取配置
+// 返回首页
+const goBack = () => {
+  router.push("/");
+};
+
+// 页面加载时读取配置（兼容版本）
 onMounted(() => {
   try {
-    const savedSettings = localStorage.getItem("sensorSettings");
-    if (savedSettings) {
-      settings.value = JSON.parse(savedSettings);
+    const savedData = localStorage.getItem("sensorSettings");
+    if (savedData) {
+      const { version, settings: savedSettings } = JSON.parse(savedData);
+      // 兼容旧版本（无version字段）
+      if (version === "1.0" || !version) {
+        settings.value = { ...DEFAULT_SETTINGS, ...savedSettings }; // 合并默认值，避免字段缺失
+      }
     }
   } catch (error) {
     console.error("读取配置失败：", error);
+    showStatusMessage("读取配置失败，使用默认值！", "error");
   }
+});
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  if (messageTimer) clearTimeout(messageTimer);
 });
 </script>
 
 <template>
   <main class="main-content">
+    <!-- 状态提示：增加过渡动画 -->
     <div
       class="status-message"
-      :class="{
-        show: statusMessage.show,
-        success: statusMessage.type === 'success',
-        error: statusMessage.type === 'error',
-      }"
-      v-if="statusMessage.show"
+      :class="[statusMessage.type, { show: statusMessage.show }]"
+      transition="fade"
     >
       {{ statusMessage.message }}
     </div>
@@ -209,14 +281,15 @@ onMounted(() => {
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">零点校准值 (kPa)</label>
+            <!-- 只读输入框增加样式区分 -->
             <input
               type="number"
-              class="form-input"
+              class="form-input form-input--readonly"
               v-model="settings.zeroCalibration"
               step="0.1"
               readonly
             />
-            <div class="form-help">当前零点偏移值</div>
+            <div class="form-help">当前零点偏移值（不可修改）</div>
           </div>
           <div class="form-group">
             <label class="form-label">满量程校准值 (kPa)</label>
@@ -225,6 +298,8 @@ onMounted(() => {
               class="form-input"
               v-model="settings.fullScaleCalibration"
               step="0.1"
+              min="0"
+              max="1000"
             />
             <div class="form-help">传感器满量程值</div>
           </div>
@@ -233,16 +308,39 @@ onMounted(() => {
     </form>
 
     <div class="button-group">
-      <button type="button" class="btn btn-success" @click="saveSettings()">💾 保存配置</button>
-      <button type="button" class="btn btn-danger" @click="resetToDefault()">🔄 恢复默认</button>
-      <!-- <button type="button" class="btn btn-secondary" @click="goBack()">
-        ↩️ 返回首页
-      </button> -->
+      <button
+        type="button"
+        class="btn btn-success"
+        @click="saveSettings()"
+        :disabled="buttonLoading.save"
+      >
+        {{ buttonLoading.save ? "💾 保存中..." : "💾 保存配置" }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-danger"
+        @click="resetToDefault()"
+        :disabled="buttonLoading.reset"
+      >
+        {{ buttonLoading.reset ? "🔄 恢复中..." : "🔄 恢复默认" }}
+      </button>
+      <button type="button" class="btn btn-secondary" @click="goBack()">↩️ 返回首页</button>
     </div>
   </main>
 </template>
 
 <style scoped>
+/* 新增过渡动画 */
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.3s ease;
+}
+
 .main-content {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
@@ -271,6 +369,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-top: 0; /* 重置默认margin */
 }
 
 .section-icon {
@@ -313,11 +412,19 @@ onMounted(() => {
   background: white;
 }
 
+/* 只读输入框样式区分 */
+.form-input--readonly {
+  background: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+  border-color: #dee2e6;
+}
+
 .form-input:focus,
 .form-select:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); /* 缩小阴影，更精致 */
 }
 
 .form-input.error {
@@ -348,6 +455,7 @@ onMounted(() => {
   margin-top: 30px;
   padding-top: 20px;
   border-top: 1px solid #e9ecef;
+  flex-wrap: wrap; /* 适配小屏幕换行 */
 }
 
 .btn {
@@ -383,21 +491,29 @@ onMounted(() => {
 
 .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 减轻阴影，更协调 */
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
 .status-message {
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 20px;
-  display: none;
+  opacity: 0;
+  transform: translateY(10px);
   text-align: center;
+  transition: all 0.3s ease;
 }
 
 .status-message.success {
@@ -413,20 +529,12 @@ onMounted(() => {
 }
 
 .status-message.show {
-  display: block;
+  opacity: 1;
+  transform: translateY(0);
 }
 
+/* 响应式优化：移除无效的container/header样式，优化布局 */
 @media (max-width: 768px) {
-  .container {
-    padding: 10px;
-  }
-
-  .header {
-    flex-direction: column;
-    gap: 15px;
-    text-align: center;
-  }
-
   .main-content {
     padding: 20px;
   }
@@ -441,7 +549,22 @@ onMounted(() => {
   }
 
   .button-group {
-    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn {
+    min-width: unset;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: 15px;
+  }
+
+  .setting-section {
+    padding: 20px 15px;
   }
 }
 </style>
