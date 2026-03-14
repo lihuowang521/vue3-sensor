@@ -65,7 +65,7 @@ const mqttConfig = defaultMqttConfig.value;
         </div>
         <div class="button-group">
           <button
-            class="control-btn"
+            class="control-btn btn-primary"
             @click="
               updateMqttConfig({
                 broker: mqttConfig.broker,
@@ -80,17 +80,19 @@ const mqttConfig = defaultMqttConfig.value;
           </button>
           <button
             class="control-btn"
-            :class="{ 'btn-success': isConnected, 'btn-primary': isConnected }"
+            :class="{ 'btn-success': isConnected, 'btn-primary': !isConnected }"
             @click="connectMqtt"
+            :disabled="isConnected"
           >
-            "连接MQTT"
+            {{ isConnected ? "已连接" : "连接MQTT" }}
           </button>
           <button
-            class="control-btn btn-danger"
-            :class="{ 'btn-success': isConnected, 'btn-primary': isConnected }"
+            class="control-btn"
+            :class="{ 'btn-danger': !isConnected, 'btn-warning': isConnected }"
             @click="disconnectMqtt"
+            :disabled="!isConnected"
           >
-            "断开MQTT"
+            断开MQTT
           </button>
         </div>
       </div>
@@ -109,9 +111,6 @@ const mqttConfig = defaultMqttConfig.value;
       <router-link class="control-btn btn-primary" to="/setting">⚙️ 参数设置</router-link>
       <router-link class="control-btn btn-secondary" to="/history">📊 历史数据</router-link>
       <router-link class="control-btn btn-success" to="/export-data">📁 导出数据</router-link>
-      <router-link class="control-btn btn-secondary" to="/calibrate-sensor"
-        >🎯 传感器校准</router-link
-      >
     </div>
   </div>
 </template>
@@ -149,6 +148,14 @@ const mqttConfig = defaultMqttConfig.value;
   margin-bottom: 15px;
 }
 
+.button-group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .input-group {
   display: flex;
   flex-direction: column;
@@ -181,12 +188,32 @@ const mqttConfig = defaultMqttConfig.value;
 }
 
 .button-group {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .button-group .control-btn {
-  width: 100%;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.button-group .control-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.button-group .control-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .connection-status {
@@ -202,7 +229,7 @@ const mqttConfig = defaultMqttConfig.value;
   color: #28a745;
 }
 
-.connection-status.disconnected1 {
+.connection-status.disconnected {
   background: rgba(220, 53, 69, 0.1);
   color: #dc3545;
 }
@@ -238,6 +265,15 @@ const mqttConfig = defaultMqttConfig.value;
   background: #28a745;
 }
 
+.btn-warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.btn-danger {
+  background: #dc3545;
+}
+
 .control-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
@@ -246,7 +282,11 @@ const mqttConfig = defaultMqttConfig.value;
 /* 响应式设计 */
 @media (max-width: 768px) {
   .mqtt-config {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  .button-group {
+    grid-template-columns: 1fr;
   }
 
   .mqtt-input {

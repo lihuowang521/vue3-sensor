@@ -3,9 +3,6 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 
-/**
- * 跳转到实时监控页面
- */
 const goToMonitoring = () => {
   try {
     router.push("/monitoring-interface");
@@ -15,9 +12,6 @@ const goToMonitoring = () => {
   }
 };
 
-/**
- * 跳转到参数设置页面
- */
 const goToSettings = () => {
   try {
     router.push("/setting");
@@ -27,9 +21,6 @@ const goToSettings = () => {
   }
 };
 
-/**
- * 跳转到历史数据页面
- */
 const goToHistory = () => {
   try {
     router.push("/history");
