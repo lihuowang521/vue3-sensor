@@ -1,4 +1,6 @@
-# vue3-sensor
+# vue3-sensor 项目:智能压力传感器人机交互界面设计（毕业设计）
+
+## 待补充
 
 This template should help get you started developing with Vue 3 in Vite.
 
