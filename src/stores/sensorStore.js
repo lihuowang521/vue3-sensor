@@ -92,7 +92,7 @@ export const useSensorStore = defineStore(
 
     // 历史数据（从rawMqttData中计算得出）
     const historyData = ref([]);
-    const gethistoryData = function (pipeId, flangeId, sensorPosition, startTime, endTime) {
+    const getHistoryData = function (pipeId, flangeId, sensorPosition, startTime, endTime) {
       historyData.value = rawMqttData.value.filter((item) => {
         return (
           item.pipe_id === pipeId &&
@@ -352,7 +352,7 @@ export const useSensorStore = defineStore(
       setSelectedFlange,
       exportDataToCSV,
       loadLatestSensorData,
-      gethistoryData,
+      getHistoryData,
     };
   },
   {

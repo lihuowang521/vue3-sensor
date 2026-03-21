@@ -3,7 +3,7 @@
 defineOptions({
   name: "HistoryPage",
 });
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useSensorStore } from "@/stores/sensorStore";
 
@@ -13,14 +13,15 @@ const router = useRouter();
 
 const currentTime = ref("");
 
-
-
-
 // 选择器绑定值
 const selectedPipeId = ref("");
 const selectedFlangeId = ref("");
+const selectedSensor = ref("sensor1");
 const startTime = ref("");
 const endTime = ref("");
+
+// 查询结果数据
+const queryResult = ref([]);
 
 // 计算属性：提取管道/法兰列表
 const pipeIdList = computed(() => sensorStore.getUniquePipeIds);
@@ -29,8 +30,8 @@ const flangeIdList = computed(() => {
   return sensorStore.getFlangeIdsByPipeId(selectedPipeId.value);
 });
 
-
-const setQuickFilter = (duration, event) => {
+// 快速时间范围选择
+const setQuickTimeRange = (duration) => {
   const now = new Date();
   let startDate = new Date();
 
@@ -54,16 +55,7 @@ const setQuickFilter = (duration, event) => {
 
   startTime.value = startDate.toISOString().slice(0, 16);
   endTime.value = now.toISOString().slice(0, 16);
-
-  // 更新活动按钮
-  document.querySelectorAll(".quick-filter-btn").forEach((btn) => {
-    btn.classList.remove("active");
-  });
-  event.target.classList.add("active");
-
-  sensorStore.queryData();
 };
-
 
 const goBack = () => {
   router.push("/monitoring-interface");
@@ -79,6 +71,22 @@ const updateTime = () => {
     minute: "2-digit",
     second: "2-digit",
   });
+};
+
+const queryData = () => {
+  if (!selectedPipeId.value || !selectedFlangeId.value || !startTime.value || !endTime.value) {
+    alert("请先选择管道、法兰和时间范围");
+    return;
+  }
+
+  const sensorPosition = parseInt(selectedSensor.value.replace("sensor", ""), 10);
+  queryResult.value = sensorStore.getHistoryData(
+    selectedPipeId.value,
+    selectedFlangeId.value,
+    sensorPosition,
+    startTime.value,
+    endTime.value,
+  );
 };
 
 let timer = null;
@@ -111,6 +119,43 @@ onUnmounted(() => {
       <div class="header-left">
         <button class="back-btn" @click="goBack()">← 返回监控</button>
         <h1>历史数据</h1>
+        <div class="sensor-select-container">
+          <div class="selector-item">
+            <label for="pipe-select">选择管道：</label>
+            <select id="pipe-select" v-model="selectedPipeId" @change="selectedFlangeId = ''">
+              <option value="">请选择管道</option>
+              <option v-for="pipeId in pipeIdList" :key="pipeId" :value="pipeId">
+                {{ pipeId }}
+              </option>
+            </select>
+          </div>
+          <div class="selector-item">
+            <label for="flange-select">选择法兰：</label>
+            <select id="flange-select" v-model="selectedFlangeId" :disabled="!selectedPipeId">
+              <option value="">请选择法兰</option>
+              <option v-for="flangeId in flangeIdList" :key="flangeId" :value="flangeId">
+                {{ flangeId }}
+              </option>
+            </select>
+          </div>
+          <div class="selector-item">
+            <label for="sensor-select">选择传感器：</label>
+            <select id="sensor-select" class="sensor-select" v-model="selectedSensor">
+              <option value="sensor1">传感器1</option>
+              <option value="sensor2">传感器2</option>
+              <option value="sensor3">传感器3</option>
+              <option value="sensor4">传感器4</option>
+              <option value="sensor5">传感器5</option>
+              <option value="sensor6">传感器6</option>
+              <option value="sensor7">传感器7</option>
+              <option value="sensor8">传感器8</option>
+              <option value="sensor9">传感器9</option>
+              <option value="sensor10">传感器10</option>
+              <option value="sensor11">传感器11</option>
+              <option value="sensor12">传感器12</option>
+            </select>
+          </div>
+        </div>
       </div>
       <!-- 头部右侧：设备信息区域 -->
       <div class="device-info">
@@ -133,13 +178,11 @@ onUnmounted(() => {
         <button class="btn-primary" @click="queryData()">🔍 查询数据</button>
       </div>
       <div class="quick-filters">
-        <button class="quick-filter-btn active" @click="setQuickFilter('1h', $event)">
-          最近1小时
-        </button>
-        <button class="quick-filter-btn" @click="setQuickFilter('6h', $event)">最近6小时</button>
-        <button class="quick-filter-btn" @click="setQuickFilter('24h', $event)">最近24小时</button>
-        <button class="quick-filter-btn" @click="setQuickFilter('7d', $event)">最近7天</button>
-        <button class="quick-filter-btn" @click="setQuickFilter('30d', $event)">最近30天</button>
+        <button class="quick-time-btn" @click="setQuickTimeRange('1h')">最近1小时</button>
+        <button class="quick-time-btn" @click="setQuickTimeRange('6h')">最近6小时</button>
+        <button class="quick-time-btn" @click="setQuickTimeRange('24h')">最近24小时</button>
+        <button class="quick-time-btn" @click="setQuickTimeRange('7d')">最近7天</button>
+        <button class="quick-time-btn" @click="setQuickTimeRange('30d')">最近30天</button>
       </div>
     </section>
 
@@ -150,13 +193,51 @@ onUnmounted(() => {
         <!-- 图表容器，通过ID供JavaScript访问以渲染图表 -->
         <div class="chart-container" id="chartContainer">
           <!-- 图表占位符，在无数据时显示提示信息 -->
-          <div class="chart-placeholder">
+          <div v-if="queryResult.length === 0" class="chart-placeholder">
             📊 压力趋势折线图<br />
             <small>选择时间范围后显示数据</small>
+          </div>
+          <div v-else class="data-summary">
+            <div class="summary-item">
+              <span class="summary-label">数据条数：</span>
+              <span class="summary-value">{{ queryResult.length }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">时间范围：</span>
+              <span class="summary-value">{{ startTime }} 至 {{ endTime }}</span>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- 数据表格区域 -->
+      <div class="data-section" v-if="queryResult.length > 0">
+        <div class="section-header">
+          <h2 class="data-title">📋 详细数据</h2>
+        </div>
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>采集时间</th>
+                <th>管道</th>
+                <th>法兰</th>
+                <th>传感器位置</th>
+                <th>压力值 (kPa)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in queryResult" :key="index">
+                <td>{{ item.parsed_time }}</td>
+                <td>{{ item.pipe_id }}</td>
+                <td>{{ item.flange_id }}</td>
+                <td>{{ item.sensor_position }}</td>
+                <td>{{ item.pressure }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </div>
 </template>
@@ -210,6 +291,56 @@ onUnmounted(() => {
 .current-time {
   font-size: 14px;
   color: #2c3e50;
+}
+
+/* 选择器容器样式 */
+.sensor-select-container {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: 20px;
+}
+
+.selector-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selector-item label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.selector-item select {
+  padding: 8px 12px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #495057;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.selector-item select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.selector-item select:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.sensor-select {
+  min-width: 150px;
 }
 
 .filter-section {
@@ -289,7 +420,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.quick-filter-btn {
+.quick-time-btn {
   padding: 8px 16px;
   border: 2px solid #667eea;
   background: white;
@@ -300,10 +431,10 @@ onUnmounted(() => {
   transition: all 0.3s ease;
 }
 
-.quick-filter-btn:hover,
-.quick-filter-btn.active {
+.quick-time-btn:hover {
   background: #667eea;
   color: white;
+  transform: translateY(-1px);
 }
 
 .content-section {
@@ -342,6 +473,32 @@ onUnmounted(() => {
 
 .chart-placeholder {
   text-align: center;
+}
+
+.data-summary {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  padding: 20px;
+  flex-wrap: wrap;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.summary-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #667eea;
 }
 
 .data-section {
@@ -490,6 +647,29 @@ onUnmounted(() => {
     text-align: center;
   }
 
+  .header-left {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .sensor-select-container {
+    flex-direction: column;
+    gap: 15px;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .selector-item {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .selector-item select {
+    width: 100%;
+    min-width: auto;
+  }
+
   .filter-grid {
     grid-template-columns: 1fr;
     gap: 15px;
@@ -507,6 +687,11 @@ onUnmounted(() => {
 
   .data-table-container {
     font-size: 12px;
+  }
+
+  .data-summary {
+    flex-direction: column;
+    gap: 15px;
   }
 }
 </style>
